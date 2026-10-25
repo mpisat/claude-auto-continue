@@ -141,7 +141,22 @@ public struct SessionResult: Equatable, Sendable {
         // Persist an uncertain send before the action: a crash must never replay it.
         try state.save(intent)
         saved = intent
-        guard try transcripts.latest(session) == .limited(event) else { return .ineligible }
+        let finalSnapshot: TranscriptSnapshot
+        do {
+            finalSnapshot = try transcripts.latest(session)
+        } catch {
+            // No UI action was invoked, so this intent is definitely unsent.
+            intent.attempts[key]?.status = .notSent
+            try state.save(intent)
+            saved = intent
+            throw error
+        }
+        guard finalSnapshot == .limited(event) else {
+            intent.attempts[key]?.status = .notSent
+            try state.save(intent)
+            saved = intent
+            return .ineligible
+        }
         let result = await ui.pressRetry(session, expected: event)
         if result == .definitelyNotSent {
             var unsent = saved

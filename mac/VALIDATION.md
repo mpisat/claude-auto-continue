@@ -18,9 +18,9 @@ Validated on 2026-10-25 against Claude Desktop 3.6556.2, embedded Claude Code 2.
 
 The owner explicitly chose to retain Claude's native auto-continue setting. The helper waits two minutes past the recorded reset and validates current transcript/UI state before retrying. It does not claim atomic exclusion with Desktop's independent sender. Its own process lock, durable event fingerprint and conservative ambiguous-send policy prevent competing helper instances or watcher restarts from blindly repeating the same event.
 
-## Remaining live gate
+## Real-reset observation and remaining gate
 
-Actual unattended five-session resumption after a real reset has not yet been observed. The selected sessions currently have different live states, so resuming completed sessions just to make a five-session demonstration would violate the safety contract. The next currently recorded limit resets at 11:50 Bangkok on 2026-10-25; fallback eligibility begins at 11:52 if the native mechanism has not already resumed the task.
+The 11:50 Bangkok reset on 2026-10-25 produced blocked_wrongIdentity for both due sessions at 11:52:27. One later Retry at 11:53:44 was followed by assistant progress confirmed at 11:54:32; the other chat resumed without a helper Retry. Actual unattended five-session resumption has not been established. The approved foreground fallback was subsequently exercised in a controlled read-only navigation test, but must still be validated at a new real reset.
 
 The installed LaunchAgent initially reported Accessibility permission false under its background identity. The owner authorized enabling the exact installed helper entry and completed macOS authentication. The Accessibility UI then showed Claude Auto Continue.app enabled. After restarting only this LaunchAgent, its own background log reported accessibility true at 10:23:26 Bangkok; launchctl confirmed the process running. Foreground diagnostics alone were not used as proof of background authorization.
 
@@ -56,3 +56,9 @@ The owner explicitly requested the missing tray icon. A separate native menu app
 - The menu installer packages its own control Makefile and instructions, so it does not depend on the source folder remaining at the original location. Fresh watcher installs include the menu app; uninstall removes both apps and retains the attempt ledger and logs.
 
 Real unattended post-reset resumption remains subject to the acceptance gate above.
+
+## Review remediation and input incident
+
+The complete bounded review, addressed native defects, inherited findings, evidence and unresolved questions are recorded in [the project review](../docs/reviews/2026-10-25.md). Current native checks passed 76 tests, plus 17 isolated installer/control tests; the unchanged CLI suite passed 31 tests.
+
+The owner reported repeated input in Claude's Code composer. It persisted after both custom helper services were stopped; normal Chat and other applications were unaffected. A clean Claude restart was deferred because active work was unsafe to interrupt. Both helpers and live UI inspection remain stopped pending that clean input test. This is an unresolved incident, not a proven root cause or a verified input fix.

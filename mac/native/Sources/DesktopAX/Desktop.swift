@@ -14,9 +14,24 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
     private var originalID: String?
     private var lastSelectedID: String?
     private let transcripts: any TranscriptSource
+    private var navigationOverride: ((Session) async -> Readiness)?
+    private var foregroundOverride: (() async -> Bool)?
+    private var snapshotOverride: (() throws -> Node)?
+    private var timeoutSetter: ((AXUIElement, Float) -> AXError)?
     public private(set) var lastDiagnostic = "not inspected"
+    private var sessionDiagnostics: [String: String] = [:]
+    public func diagnostic(for sessionID: String) -> String? { sessionDiagnostics[sessionID] }
 
     public init(transcripts: any TranscriptSource) { self.transcripts = transcripts }
+    internal init(transcripts: any TranscriptSource, navigation: ((Session) async -> Readiness)? = nil,
+                  foreground: @escaping () async -> Bool, snapshot: (() throws -> Node)? = nil,
+                  timeoutSetter: ((AXUIElement, Float) -> AXError)? = nil) {
+        self.transcripts = transcripts
+        navigationOverride = navigation
+        foregroundOverride = foreground
+        snapshotOverride = snapshot
+        self.timeoutSetter = timeoutSetter
+    }
     public static var trusted: Bool { AXIsProcessTrusted() }
 
     public static func requestPermission() {
@@ -36,14 +51,20 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
     private func text(_ element: AXUIElement, _ name: String) -> String {
         attribute(element, name) as? String ?? ""
     }
+    internal func configureMessagingTimeout() throws {
+        let result = (timeoutSetter ?? AXUIElementSetMessagingTimeout)(AXUIElementCreateSystemWide(), 0.3)
+        guard result == .success else { lastDiagnostic = "AX timeout setup failed: \(result.rawValue)"; throw DesktopError.incompleteTree }
+    }
+
     private func capture() throws -> Snapshot {
+        if let snapshotOverride { return Snapshot(root: try snapshotOverride(), elements: [:]) }
         guard Self.trusted else { throw DesktopError.permission }
         let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.anthropic.claudefordesktop")
         guard apps.count == 1, let app = apps.first else { throw DesktopError.notRunning }
         captureHealth = CaptureHealth()
         lastDiagnostic = ""
         let root = AXUIElementCreateApplication(app.processIdentifier)
-        AXUIElementSetMessagingTimeout(root, 0.3)
+        try configureMessagingTimeout()
         guard let windows = attribute(root, kAXWindowsAttribute) as? [AXUIElement] else { throw DesktopError.incompleteTree }
         let deadline = Date().addingTimeInterval(10)
         var elements: [Int: AXUIElement] = [:]
@@ -82,6 +103,52 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
     }
 
     public func prepare(_ session: Session) async -> Readiness {
+        lastDiagnostic = ""
+        defer { sessionDiagnostics[session.id] = lastDiagnostic }
+        let background = await navigateForPreparation(session)
+        let detail = lastDiagnostic
+        guard !Task.isCancelled else { lastDiagnostic = "navigation cancelled"; return .unavailable }
+        guard background == .wrongIdentity || background == .unavailable else {
+            if lastDiagnostic.isEmpty { lastDiagnostic = background.rawValue }
+            return background
+        }
+        guard await foregroundClaude() else {
+            lastDiagnostic = "could not bring Claude forward after \(background.rawValue): \(lastDiagnostic)"
+            return .unavailable
+        }
+        guard !Task.isCancelled else { lastDiagnostic = "navigation cancelled"; return .unavailable }
+        // Activation can wake native auto-continue. Capture and evaluate again;
+        // the coordinator still rechecks the transcript before any Retry action.
+        let result = await navigateForPreparation(session)
+        lastDiagnostic = "foreground fallback after \(background.rawValue) (\(detail)); result \(result.rawValue): \(lastDiagnostic)"
+        return result
+    }
+
+    private func navigateForPreparation(_ session: Session) async -> Readiness {
+        if let navigationOverride { return await navigationOverride(session) }
+        return await navigate(session)
+    }
+
+    private func foregroundClaude() async -> Bool {
+        if let foregroundOverride { return await foregroundOverride() }
+        guard Self.trusted else { lastDiagnostic = "Accessibility permission missing"; return false }
+        let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.anthropic.claudefordesktop")
+        guard apps.count == 1, let app = apps.first else { lastDiagnostic = "Claude is not uniquely available"; return false }
+        if app.isActive { return true }
+        let element = AXUIElementCreateApplication(app.processIdentifier)
+        AXUIElementSetMessagingTimeout(element, 0.3)
+        let result = AXUIElementSetAttributeValue(element, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        guard result == .success else { lastDiagnostic = "foreground request failed: \(result.rawValue)"; return false }
+        for _ in 0..<20 {
+            guard !Task.isCancelled else { return false }
+            if app.isActive { return true }
+            do { try await Task.sleep(for: .milliseconds(100)) } catch { return false }
+        }
+        lastDiagnostic = "Claude did not become active within two seconds"
+        return false
+    }
+
+    private func navigate(_ session: Session) async -> Readiness {
         do {
             let first = try capture()
             let current = Tree.sessionID(in: first.root)
@@ -91,15 +158,17 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
                 return readiness(first, for: session)
             }
             // Never navigate away while a person has a draft in the current session.
-            if current != nil && Tree.hasDraft(in: first.root) { return .draft }
+            if Tree.hasDraft(in: first.root) { return .draft }
             guard let id = Tree.sidebarButton(in: first.root, title: session.title,
                                              folder: URL(fileURLWithPath: session.cwd).lastPathComponent),
                   let button = first.elements[id] else { return .unavailable }
             guard AXUIElementPerformAction(button, kAXPressAction as CFString) == .success else { return .unavailable }
             lastSelectedID = session.id
+            var observed = current
             for _ in 0..<20 {
                 try await Task.sleep(for: .milliseconds(250))
                 let next = try capture()
+                observed = Tree.sessionID(in: next.root)
                 if Tree.sessionID(in: next.root) == session.id {
                     let state = readiness(next, for: session)
                     if state != .draft || Tree.all(next.root).contains(where: { $0.role == "AXTextArea" && $0.label == "Prompt" }) {
@@ -107,6 +176,7 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
                     }
                 }
             }
+            lastDiagnostic = "chat selection timed out; expected \(session.id); observed \(observed ?? "unknown")"
             return .wrongIdentity
         } catch {
             lastDiagnostic = String(describing: error) + ":" + lastDiagnostic
@@ -115,23 +185,41 @@ public enum DesktopError: Error { case permission, notRunning, incompleteTree }
     }
 
     public func pressRetry(_ session: Session, expected: LimitEvent) async -> PressOutcome {
+        defer { sessionDiagnostics[session.id] = lastDiagnostic }
         // The AX action uses a fresh handle. A stale handle or timeout is ambiguous,
         // never a reason to send a second turn. Desktop's own sender is independent.
         do {
             let before = try transcripts.latest(session)
-            guard before == .limited(expected), expected.resetsAt <= Date() else { return .definitelyNotSent }
+            guard before == .limited(expected), expected.resetsAt <= Date() else {
+                lastDiagnostic = "Retry skipped: transcript changed or reset is still in the future"
+                return .definitelyNotSent
+            }
             let snapshot = try capture()
-            guard readiness(snapshot, for: session) == .ready,
-                  let id = Tree.retry(in: snapshot.root, sessionID: session.id), let button = snapshot.elements[id],
-                  try transcripts.latest(session) == before else { return .definitelyNotSent }
+            let state = readiness(snapshot, for: session)
+            guard state == .ready else {
+                lastDiagnostic = "Retry skipped: " + state.rawValue
+                return .definitelyNotSent
+            }
+            guard let id = Tree.retry(in: snapshot.root, sessionID: session.id), let button = snapshot.elements[id] else {
+                lastDiagnostic = "Retry skipped: verified control is unavailable"
+                return .definitelyNotSent
+            }
+            guard try transcripts.latest(session) == before else {
+                lastDiagnostic = "Retry skipped: transcript changed before pressing"
+                return .definitelyNotSent
+            }
             let result = AXUIElementPerformAction(button, kAXPressAction as CFString)
+            lastDiagnostic = result == .success ? "Retry pressed; awaiting assistant progress" : "Retry outcome uncertain; AX error \(result.rawValue)"
             return result == .success ? .pressed : .ambiguous
         } catch { lastDiagnostic = String(describing: error); return .definitelyNotSent }
     }
 
-    public func diagnose(_ session: Session) async -> Readiness {
+    public func diagnose(_ session: Session, foreground: Bool = false) async -> Readiness {
+        if foreground {
+            guard await foregroundClaude() else { return .unavailable }
+        }
         let result = await prepare(session)
-        if result != .unavailable { lastDiagnostic = result.rawValue }
+        if foreground { lastDiagnostic = "foreground verified; " + lastDiagnostic }
         return result
     }
 

@@ -7,6 +7,7 @@ import ResumeCore
 private struct Options {
     var command = "doctor"
     var dryRun = false
+    var foreground = false
     var metadata: URL
     var projects: URL
     var stateDirectory: URL
@@ -21,6 +22,7 @@ private struct Options {
         while index < arguments.count {
             let key = arguments[index]; index += 1
             if key == "--dry-run" { dryRun = true; continue }
+            if key == "--foreground" { foreground = true; continue }
             guard ["--metadata-root", "--projects-root", "--state-dir", "--session"].contains(key), index < arguments.count else {
                 throw CLIError.usage
             }
@@ -34,6 +36,7 @@ private struct Options {
             }
         }
         guard ["doctor", "list", "diagnose", "once", "watch", "request-permission", "help"].contains(command) else { throw CLIError.usage }
+        if foreground && command != "diagnose" { throw CLIError.usage }
         if ["watch", "once"].contains(command) && !dryRun && selected.isEmpty { throw CLIError.usage }
     }
 }
@@ -116,7 +119,12 @@ private final class ProcessLock {
             let results = await coordinator.runOnce(dryRun: options.dryRun)
             if results != previous {
                 for result in results where !previous.contains(result) {
-                    emit(["session": result.sessionID, "outcome": describe(result)])
+                    var fields = ["session": result.sessionID, "outcome": describe(result)]
+                    if let diagnostic = desktop.diagnostic(for: result.sessionID) {
+                        if case .blocked = result.outcome { fields["diagnostic"] = diagnostic }
+                        if case .attempted = result.outcome { fields["diagnostic"] = diagnostic }
+                    }
+                    emit(fields)
                 }
                 previous = results
             }
@@ -150,7 +158,7 @@ private final class ProcessLock {
         do {
             switch options.command {
             case "help":
-                print("ClaudeResume doctor|list|diagnose|once|watch|request-permission [--dry-run] [--session local_ID] [--metadata-root PATH] [--projects-root PATH] [--state-dir PATH]")
+                print("ClaudeResume doctor|list|diagnose|once|watch|request-permission [diagnose: --foreground] [--dry-run] [--session local_ID] [--metadata-root PATH] [--projects-root PATH] [--state-dir PATH]")
             case "request-permission":
                 Desktop.requestPermission()
                 emit(["accessibility": Desktop.trusted, "action": "Enable Claude Auto Continue in System Settings > Privacy & Security > Accessibility if required"])
@@ -166,7 +174,7 @@ private final class ProcessLock {
                 ownership = try ProcessLock(directory: options.stateDirectory)
                 let sessions = try source.discover()
                 for session in sessions {
-                    let readiness = await desktop.diagnose(session)
+                    let readiness = await desktop.diagnose(session, foreground: options.foreground)
                     emit(["session": session.id, "readiness": readiness.rawValue, "diagnostic": desktop.lastDiagnostic])
                 }
                 await desktop.restore((try? source.base.discover()) ?? [])

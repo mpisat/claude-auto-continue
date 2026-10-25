@@ -6,6 +6,8 @@ struct MenuSnapshot: Sendable, Equatable {
     var startsAtLogin: Bool? = nil
     var sessionCount: Int? = nil
 
+    var canStopWatcher: Bool { state == .running || state == .stopped }
+
     static func parse(exitCode: Int32, output: String) -> MenuSnapshot {
         guard exitCode == 0 else { return MenuSnapshot(state: .unavailable) }
         let lines = output.split(separator: "\n").map(String.init)

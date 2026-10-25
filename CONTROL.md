@@ -1,11 +1,13 @@
 # Control Claude Auto Continue
 
-Open Terminal and enter this folder:
+Open Terminal and use the controls packaged with the installed menu app:
 
 ```bash
-cd /Users/muratpisat/Documents/Developer/vibe/claude-auto-continue
+cd "$HOME/Applications/Claude Auto Continue Menu.app/Contents/Resources"
 make
 ```
+
+From a source checkout, run the same commands in the repository root: the folder containing `Makefile` and this `CONTROL.md`. Building or reinstalling requires that source checkout; the installed bundle contains the runtime controls and guides.
 
 Look for **AC with a circular-arrow icon** in the macOS menu bar. Click it to see Running/Stopped, the selected session count, and Start at login. Use **Start Watcher**, **Stop Watcher** or **Restart Watcher** there. The menu also opens logs, Accessibility settings and these instructions.
 
@@ -16,7 +18,7 @@ The menu app starts at login independently of the watcher, so the icon remains v
 | Command | What it does |
 | --- | --- |
 | `make menu` | Opens the installed menu-bar controller. |
-| `make menu-install` | Builds and installs the menu app without replacing the watcher or its Accessibility identity. |
+| `make menu-install` | From a source checkout, builds and installs the menu app without replacing the watcher or its Accessibility identity. |
 | `make status` | Shows ON/OFF, whether it starts at login, and the number of selected sessions. |
 | `make start` | Starts the watcher and enables it at future logins. Safe to run when already running. |
 | `make stop` | Stops the watcher and keeps it off across logins until you run `make start`. |

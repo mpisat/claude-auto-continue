@@ -69,7 +69,7 @@ import AppKit
         item.button?.image?.isTemplate = true
         item.button?.toolTip = "Claude Auto Continue: " + message
         start.isEnabled = !busy && snapshot.state == .stopped
-        stop.isEnabled = !busy && snapshot.state == .running
+        stop.isEnabled = !busy && snapshot.canStopWatcher
         restart.isEnabled = !busy && [.running, .stopped].contains(snapshot.state)
         quit.isEnabled = !busy
     }

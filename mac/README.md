@@ -56,10 +56,11 @@ watcher="$HOME/Applications/Claude Auto Continue.app/Contents/MacOS/ClaudeResume
 "$watcher" list
 "$watcher" once --dry-run --session local_YOUR_SESSION_UUID
 "$watcher" diagnose --session local_YOUR_SESSION_UUID
+"$watcher" diagnose --foreground --session local_YOUR_SESSION_UUID
 "$watcher" once --session local_YOUR_SESSION_UUID
 ```
 
-`once --dry-run` evaluates transcript eligibility without navigating, clicking or changing the attempt ledger. `diagnose` additionally visits the selected sessions, checks the current UI and restores the original session when it is safe; it never presses Retry. `once` performs eligible retries. `watch` runs the same coordinator every 15 seconds. Actual `once` and `watch` require an explicit session selection.
+`once --dry-run` evaluates transcript eligibility without navigating, clicking or changing the attempt ledger. `diagnose` additionally visits the selected sessions, checks the current UI and restores the original session when it is safe; it never presses Retry. `diagnose --foreground` explicitly brings Claude forward for that read-only check. The flag is rejected for action commands. `once` performs eligible retries. `watch` runs the same coordinator every 15 seconds. Actual `once` and `watch` require an explicit session selection.
 
 The LaunchAgent owns the same exclusive process lock as manual action commands. If it is running, `once` and `diagnose` fail with `alreadyRunning` rather than running competing controllers. `doctor`, `list` and `help` remain available. To temporarily unload it:
 
@@ -74,7 +75,7 @@ Restore it with the corresponding `launchctl bootstrap` command and the same arg
 1. Discover selected non-archived local Desktop sessions from their metadata. Resolve each actual CLI session ID to a unique local transcript.
 2. Read backward to the newest meaningful top-level transcript event. Only an explicit rejected `five_hour` rate-limit record with a numeric reset qualifies. Later user/automatic continuation messages, normal assistant progress, other errors and unknown data suppress retry. Known metadata, tool results and task notifications are excluded from that decision.
 3. Wait until two minutes after the reset, giving native auto-continue its first opportunity. There is no age expiry that discards an overnight missed reset.
-4. Select the exact sidebar entry and verify the resulting local session ID through its Accessibility URL. Duplicate labels, unknown layouts, incomplete Accessibility reads, dialogs, busy controls, drafts and pending file attachments block the action.
+4. Select the exact sidebar entry and verify the resulting local session ID through its Accessibility URL. If background selection fails, the owner-approved fallback may bring Claude to the foreground and retry navigation once. Activation and current state are verified again. Duplicate labels, unknown layouts, incomplete Accessibility reads, dialogs, busy controls, drafts and pending file attachments block Retry.
 5. Re-read transcript evidence, persist the attempt, then obtain a fresh retry button inside the session's actual Session limit reached card. No generic Continue matching, coordinate clicking, prompt insertion or clipboard manipulation is used.
 6. Verify progress from a later genuine assistant record. A click alone is recorded as attempted, not successful.
 
@@ -103,7 +104,7 @@ bash -n mac/build-native.sh mac/install-watcher.sh
 
 Tests include five-session coordinator execution with real local fixtures, weekly/future limits, new human/native input, restart replay prevention, state-save failure, ambiguous sends, retry exhaustion, relocation, malformed/partial transcript data and Accessibility safety predicates. They do not send model requests.
 
-Read-only live diagnostics establish discovery, navigation, identity and card recognition. Successful unattended resumption must additionally be observed after a real reset; unit tests and a successful build do not establish that. See `VALIDATION.md` for the recorded local validation.
+Read-only live diagnostics establish discovery, navigation, identity and card recognition. Successful unattended resumption must additionally be observed after a real reset; unit tests and a successful build do not establish that. See `VALIDATION.md` for the recorded local validation and [the complete project review](../docs/reviews/2026-10-25.md) for addressed native defects and open inherited findings.
 
 ## Uninstall
 

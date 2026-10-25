@@ -39,3 +39,14 @@ import Testing
 ]) func incompleteOrUnknownOutputCannotClaimRunning(_ output: String) {
     #expect(MenuSnapshot.parse(exitCode: 0, output: output).state == .unavailable)
 }
+
+@Test func stopRemainsAvailableForLoadedWaitingJob() {
+    let status = MenuSnapshot.parse(exitCode: 0, output: "Watcher: NOT RUNNING (loaded, state: waiting)\nStart at login: ON\nSelected sessions: 5\n")
+    #expect(status.canStopWatcher)
+}
+
+@Test func stopRequiresAnInstalledWatcher() {
+    #expect(MenuSnapshot(state: .running).canStopWatcher)
+    #expect(!MenuSnapshot(state: .notInstalled).canStopWatcher)
+    #expect(!MenuSnapshot(state: .unavailable).canStopWatcher)
+}

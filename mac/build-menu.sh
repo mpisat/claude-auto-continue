@@ -4,10 +4,11 @@ mac_source_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 swift build --package-path "$mac_source_dir/native" -c release --product ClaudeMenu >&2
 menu_binary_dir="$(swift build --package-path "$mac_source_dir/native" -c release --show-bin-path)"
 menu_app="$mac_source_dir/native/.build/Claude Auto Continue Menu.app"
-mkdir -p "$menu_app/Contents/MacOS" "$menu_app/Contents/Resources/mac"
+mkdir -p "$menu_app/Contents/MacOS" "$menu_app/Contents/Resources/mac" "$menu_app/Contents/Resources/docs/reviews"
 cp "$menu_binary_dir/ClaudeMenu" "$menu_app/Contents/MacOS/ClaudeMenu"
 cp "$mac_source_dir/../Makefile" "$mac_source_dir/../CONTROL.md" "$menu_app/Contents/Resources/"
 cp "$mac_source_dir/README.md" "$mac_source_dir/VALIDATION.md" "$menu_app/Contents/Resources/mac/"
+cp "$mac_source_dir/../docs/reviews/2026-10-25.md" "$menu_app/Contents/Resources/docs/reviews/"
 python3 - "$menu_app/Contents/Info.plist" <<'PY'
 import plistlib,sys
 with open(sys.argv[1], 'wb') as file:

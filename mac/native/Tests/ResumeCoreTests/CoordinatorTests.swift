@@ -48,7 +48,7 @@ import Testing
         #expect(result.map(\.outcome) == [.ineligible])
         #expect(ui.presses.isEmpty)
         #expect(store.value.attempts["local_0:100.0"]?.fingerprint == "error-local_0")
-        #expect(store.value.attempts["local_0:100.0"]?.status == .pending)
+        #expect(store.value.attempts["local_0:100.0"]?.status == .notSent)
     }
     @Test func overlappingRunsCannotReplayTheSameIntent() async {
         let sessions = Sessions(), transcripts = Transcripts(), store = Store(), ui = UI()

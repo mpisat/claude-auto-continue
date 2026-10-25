@@ -11,6 +11,17 @@ MENU_APP := $(HOME)/Applications/Claude Auto Continue Menu.app
 MENU_PLIST := $(HOME)/Library/LaunchAgents/$(MENU_LABEL).plist
 LOG_DIR := $(HOME)/Library/Logs/Claude Auto Continue
 
+# A print error is not proof that a job is absent. Preserve its diagnostic and
+# abort the recipe unless launchctl specifically reports a missing service.
+define inspect_service
+service_loaded() { \
+  if service_info="$$(launchctl print "$$1" 2>&1)"; then return 0; \
+  else service_status=$$?; fi; \
+  [[ "$$service_status" -eq 113 ]] && return 1; \
+  printf '%s\n' "$$service_info" >&2; exit "$$service_status"; \
+};
+endef
+
 .PHONY: help status start stop restart logs doctor sessions menu menu-install
 
 help:
@@ -31,10 +42,12 @@ help:
 
 status:
 	@set -euo pipefail; \
+	$(inspect_service) \
 	if [[ ! -f "$(PLIST)" ]]; then \
 	  printf '%s\n' 'Watcher: NOT INSTALLED' 'See mac/README.md for installation.'; exit 0; \
 	fi; \
-	if info="$$(launchctl print "$(SERVICE)" 2>/dev/null)"; then \
+	if service_loaded "$(SERVICE)"; then \
+	  info="$$service_info"; \
 	  state="$$(printf '%s\n' "$$info" | awk '$$1 == "state" && $$2 == "=" {print $$3; exit}')"; \
 	  pid="$$(printf '%s\n' "$$info" | awk '$$1 == "pid" && $$2 == "=" {print $$3; exit}')"; \
 	  if [[ "$$state" == running ]]; then \
@@ -46,20 +59,24 @@ status:
 	if [[ "$$disabled" == true || "$$disabled" == disabled || "$$at_login" != true ]]; then \
 	  printf '%s\n' 'Start at login: OFF'; \
 	else printf '%s\n' 'Start at login: ON'; fi; \
-	count="$$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' "$(PLIST)" | awk '$$1 == "--session" {n++} END {print n+0}')"; \
+	count="$$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments' "$(PLIST)" | awk '$$1 == "--session" {session=1; next} session {sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$$/, ""); selected[$$0]=1; session=0} END {for (id in selected) n++; print n+0}')"; \
 	printf 'Selected sessions: %s\n' "$$count"
 
 start:
 	@set -euo pipefail; \
+	$(inspect_service) \
 	[[ -x "$(APP)/Contents/MacOS/ClaudeResume" && -f "$(PLIST)" ]] || \
 	  { printf '%s\n' 'Watcher is not installed. See mac/README.md.' >&2; exit 1; }; \
 	launchctl enable "$(SERVICE)"; \
-	if ! launchctl print "$(SERVICE)" >/dev/null 2>&1; then \
+	if ! service_loaded "$(SERVICE)"; then \
 	  launchctl bootstrap "$(DOMAIN)" "$(PLIST)"; \
 	fi; \
 	launchctl kickstart "$(SERVICE)"; \
 	for _ in {1..25}; do \
-	  state="$$(launchctl print "$(SERVICE)" 2>/dev/null | awk '$$1 == "state" && $$2 == "=" {print $$3; exit}')" || state=''; \
+	  state=''; \
+	  if service_loaded "$(SERVICE)"; then \
+	    state="$$(printf '%s\n' "$$service_info" | awk '$$1 == "state" && $$2 == "=" {print $$3; exit}')"; \
+	  fi; \
 	  [[ "$$state" == running ]] && break; \
 	  sleep 0.2; \
 	done; \
@@ -68,15 +85,16 @@ start:
 
 stop:
 	@set -euo pipefail; \
+	$(inspect_service) \
 	launchctl disable "$(SERVICE)"; \
-	if launchctl print "$(SERVICE)" >/dev/null 2>&1; then \
+	if service_loaded "$(SERVICE)"; then \
 	  launchctl bootout "$(SERVICE)"; \
 	fi; \
 	for _ in {1..25}; do \
-	  if ! launchctl print "$(SERVICE)" >/dev/null 2>&1; then break; fi; \
+	  if ! service_loaded "$(SERVICE)"; then break; fi; \
 	  sleep 0.2; \
 	done; \
-	if launchctl print "$(SERVICE)" >/dev/null 2>&1; then \
+	if service_loaded "$(SERVICE)"; then \
 	  printf '%s\n' 'Watcher is still unloading after five seconds. Check make status.' >&2; exit 1; \
 	fi
 	@$(MAKE) --no-print-directory status
@@ -96,10 +114,11 @@ sessions:
 
 menu:
 	@set -euo pipefail; \
+	$(inspect_service) \
 	[[ -x "$(MENU_APP)/Contents/MacOS/ClaudeMenu" && -f "$(MENU_PLIST)" ]] || \
 	  { printf '%s\n' 'Menu app is not installed. Run make menu-install.' >&2; exit 1; }; \
 	launchctl enable "$(DOMAIN)/$(MENU_LABEL)"; \
-	if ! launchctl print "$(DOMAIN)/$(MENU_LABEL)" >/dev/null 2>&1; then \
+	if ! service_loaded "$(DOMAIN)/$(MENU_LABEL)"; then \
 	  launchctl bootstrap "$(DOMAIN)" "$(MENU_PLIST)"; \
 	fi; \
 	launchctl kickstart "$(DOMAIN)/$(MENU_LABEL)"

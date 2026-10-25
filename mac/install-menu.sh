@@ -10,13 +10,22 @@ menu_service="$menu_domain/$menu_label"
 menu_logs="$HOME/Library/Logs/Claude Auto Continue"
 [[ $# -eq 0 || ( $# -eq 1 && "$1" == --uninstall ) ]] || { echo 'Usage: bash mac/install-menu.sh [--uninstall]' >&2; exit 2; }
 if [[ $# -eq 0 ]]; then menu_built_app="$(bash "$mac_source_dir/build-menu.sh")"; fi
-if launchctl print "$menu_service" >/dev/null 2>&1; then
+# launchctl print returns 113 only when this exact service is absent.
+menu_loaded() {
+    local info status
+    if info="$(launchctl print "$menu_service" 2>&1)"; then return 0
+    else status=$?; fi
+    [[ "$status" -eq 113 ]] && return 1
+    printf '%s\n' "$info" >&2
+    exit "$status"
+}
+if menu_loaded; then
     launchctl bootout "$menu_service"
     for _ in {1..25}; do
-        if ! launchctl print "$menu_service" >/dev/null 2>&1; then break; fi
+        if ! menu_loaded; then break; fi
         sleep 0.2
     done
-    if launchctl print "$menu_service" >/dev/null 2>&1; then echo 'Menu app is still unloading.' >&2; exit 1; fi
+    if menu_loaded; then echo 'Menu app is still unloading.' >&2; exit 1; fi
 fi
 if [[ "${1:-}" == --uninstall ]]; then
     rm -f "$menu_plist"
