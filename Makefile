@@ -6,14 +6,19 @@ DOMAIN := gui/$(shell id -u)
 SERVICE := $(DOMAIN)/$(LABEL)
 APP := $(HOME)/Applications/Claude Auto Continue.app
 PLIST := $(HOME)/Library/LaunchAgents/$(LABEL).plist
+MENU_LABEL := io.github.claude-ac.macos-menu
+MENU_APP := $(HOME)/Applications/Claude Auto Continue Menu.app
+MENU_PLIST := $(HOME)/Library/LaunchAgents/$(MENU_LABEL).plist
 LOG_DIR := $(HOME)/Library/Logs/Claude Auto Continue
 
-.PHONY: help status start stop restart logs doctor sessions
+.PHONY: help status start stop restart logs doctor sessions menu menu-install
 
 help:
 	@printf '%s\n' \
 	  'Claude Desktop auto-continue controls (macOS)' \
 	  '' \
+	  '  make menu      Show the menu-bar controller' \
+	  '  make menu-install  Build and install the menu-bar controller' \
 	  '  make status    Show whether the watcher is running and enabled at login' \
 	  '  make start     Start it now and enable it at future logins' \
 	  '  make stop      Stop it now and keep it off at future logins' \
@@ -88,3 +93,16 @@ doctor:
 
 sessions:
 	@"$(APP)/Contents/MacOS/ClaudeResume" list
+
+menu:
+	@set -euo pipefail; \
+	[[ -x "$(MENU_APP)/Contents/MacOS/ClaudeMenu" && -f "$(MENU_PLIST)" ]] || \
+	  { printf '%s\n' 'Menu app is not installed. Run make menu-install.' >&2; exit 1; }; \
+	launchctl enable "$(DOMAIN)/$(MENU_LABEL)"; \
+	if ! launchctl print "$(DOMAIN)/$(MENU_LABEL)" >/dev/null 2>&1; then \
+	  launchctl bootstrap "$(DOMAIN)" "$(MENU_PLIST)"; \
+	fi; \
+	launchctl kickstart "$(DOMAIN)/$(MENU_LABEL)"
+
+menu-install:
+	@bash mac/install-menu.sh

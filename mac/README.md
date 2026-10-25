@@ -4,6 +4,8 @@ The native watcher resumes selected existing local Code-tab sessions after a con
 
 ## Everyday controls
 
+Click **AC with a circular-arrow icon** in the macOS menu bar for status, Start/Stop/Restart, logs and settings. The menu remains available when the watcher is stopped. Existing watcher-only installs can add it with `make menu-install`; use `make menu` to reopen it after quitting. The menu app needs no Accessibility permission of its own.
+
 Use the Makefile in the repository root. See [CONTROL.md](../CONTROL.md) for the short guide.
 
 ```bash

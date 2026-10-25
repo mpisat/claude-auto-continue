@@ -43,3 +43,16 @@ Live control checks on 2026-10-25 exercised the production Makefile against only
 - GNU Make 3.81 executed the targets. Expanded recipes passed bash syntax validation and ShellCheck at warning severity.
 
 The watcher was left running with startup at login enabled. This validation does not change the real-reset acceptance gate above.
+
+## Menu-bar app validation
+
+The owner explicitly requested the missing tray icon. A separate native menu app now controls the same installed watcher through a bundled copy of the tested Makefile. It remains visible when the watcher is stopped, starts at login independently, and adds status, Start/Stop/Restart, logs, Accessibility settings and instructions. Quitting the menu app leaves the watcher running. One status read every 15 seconds is needed because launchd supplies no supported job-change feed for external Makefile controls; unchanged status produces no log writes.
+
+- Status interpretation tests failed on the initial stub, then passed for running, stopped, loaded-but-not-running, missing installation, command failure and incomplete/unknown output.
+- The full native test suite passed with the menu executable included. The menu release build, strict signature verification, script syntax checks, ShellCheck and expanded Makefile recipe checks passed.
+- The installed menu app's background log reported running, five sessions, login enabled and status-command exit zero. Its error log was empty. The owner confirmed the tray icon was visible.
+- The native UI automation tool could not attach to this windowless menu app. Direct automated clicks on menu items remain unverified; the shared Start/Stop/Restart commands were exercised in the folder-controls validation above.
+- Both LaunchAgents were running. The original watcher PID remained unchanged during menu installation, and its executable hash still matched the original build, preserving its Accessibility identity. Menu installation does not rebuild or replace that watcher.
+- The menu installer packages its own control Makefile and instructions, so it does not depend on the source folder remaining at the original location. Fresh watcher installs include the menu app; uninstall removes both apps and retains the attempt ledger and logs.
+
+Real unattended post-reset resumption remains subject to the acceptance gate above.

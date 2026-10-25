@@ -7,10 +7,16 @@ cd /Users/muratpisat/Documents/Developer/vibe/claude-auto-continue
 make
 ```
 
-`make` shows the available controls. The installed watcher runs in the background; this version uses these folder controls and has no menu-bar icon.
+Look for **AC with a circular-arrow icon** in the macOS menu bar. Click it to see Running/Stopped, the selected session count, and Start at login. Use **Start Watcher**, **Stop Watcher** or **Restart Watcher** there. The menu also opens logs, Accessibility settings and these instructions.
+
+The menu app starts at login independently of the watcher, so the icon remains visible when you stop the watcher. **Quit Menu Bar (watcher keeps running)** closes only the menu app. To reopen it, run `make menu`. External Makefile changes refresh when you open the menu or within 15 seconds.
+
+`make` shows the folder controls. Both interfaces control the same installed service and preserve the selected sessions.
 
 | Command | What it does |
 | --- | --- |
+| `make menu` | Opens the installed menu-bar controller. |
+| `make menu-install` | Builds and installs the menu app without replacing the watcher or its Accessibility identity. |
 | `make status` | Shows ON/OFF, whether it starts at login, and the number of selected sessions. |
 | `make start` | Starts the watcher and enables it at future logins. Safe to run when already running. |
 | `make stop` | Stops the watcher and keeps it off across logins until you run `make start`. |

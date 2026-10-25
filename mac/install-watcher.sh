@@ -9,6 +9,7 @@ watcher_data="$HOME/Library/Application Support/Claude Auto Continue"
 watcher_logs="$HOME/Library/Logs/Claude Auto Continue"
 watcher_domain="gui/$(id -u)"
 if [[ "${1:-}" == "--uninstall" ]]; then
+    bash "$mac_source_dir/install-menu.sh" --uninstall
     launchctl bootout "$watcher_domain" "$watcher_plist" 2>/dev/null || true
     rm -f "$watcher_plist"
     rm -rf "$watcher_app"
@@ -48,3 +49,5 @@ plutil -lint "$watcher_plist"
 launchctl bootstrap "$watcher_domain" "$watcher_plist"
 printf 'Installed for %s sessions. Logs: %s/watcher.log\n' "$((${#watcher_sessions[@]} / 2))" "$watcher_logs"
 printf 'If Accessibility is false, run: open "%s" --args request-permission\n' "$watcher_app"
+
+bash "$mac_source_dir/install-menu.sh"
