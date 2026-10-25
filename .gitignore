@@ -1,0 +1,3 @@
+mac/native/.build/
+mac/native/.swiftpm/
+tests/.fixtures/

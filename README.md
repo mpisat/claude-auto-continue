@@ -98,15 +98,20 @@ Vuoi la **ripresa automatica** (opt-in)? `powershell -ExecutionPolicy Bypass -Fi
 
 ### App desktop — macOS
 
+The native macOS watcher monitors explicitly selected existing Code-tab sessions,
+waits for a confirmed five-hour limit to reset, and retries through the actual
+session's Accessibility controls. It includes dry-run diagnostics, durable attempt
+tracking, bounded retries, and a user LaunchAgent.
+
 ```bash
-git clone https://github.com/blackstardigitalstudio/claude-auto-continue.git
-cd claude-auto-continue
-bash mac/make-shortcut-mac.sh
+bash mac/build-native.sh
+"mac/native/.build/Claude Auto Continue.app/Contents/MacOS/ClaudeResume" list
 ```
 
-Crea sul Desktop i due tasti `.command`. La prima volta concedi l'accesso
-**Accessibilità** al Terminale (Impostazioni di Sistema → Privacy e Sicurezza →
-Accessibilità). Dettagli in [`mac/`](mac/README.md).
+Follow [the macOS guide](mac/README.md) to select session IDs, grant Accessibility
+permission if required, install the watcher, and uninstall it. Native auto-continue
+is preserved; the helper acts as a fallback two minutes after reset. Read the
+coexistence and live-validation limitations before unattended use.
 
 ### Terminale (CLI)
 
@@ -214,7 +219,8 @@ action is opening the PayPal page in your browser — **only if** you click "Buy
 # Windows desktop app
 powershell -ExecutionPolicy Bypass -File windows\make-shortcut.ps1
 # macOS desktop app
-bash mac/make-shortcut-mac.sh
+bash mac/build-native.sh
+# Select sessions and install: see mac/README.md
 # CLI
 ./install.sh
 ```
