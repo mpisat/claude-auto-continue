@@ -25,3 +25,21 @@ Actual unattended five-session resumption after a real reset has not yet been ob
 The installed LaunchAgent initially reported Accessibility permission false under its background identity. The owner authorized enabling the exact installed helper entry and completed macOS authentication. The Accessibility UI then showed Claude Auto Continue.app enabled. After restarting only this LaunchAgent, its own background log reported accessibility true at 10:23:26 Bangkok; launchctl confirmed the process running. Foreground diagnostics alone were not used as proof of background authorization.
 
 No Cloudflare validation, synthetic model requests, credit purchases, plan changes, credential-store reads, or conversation uploads were performed.
+
+## Folder controls validation
+
+The owner requested a Makefile with instructions or a menu-bar launcher. The repository-root Makefile and CONTROL.md provide the requested folder controls without changing the installed native executable.
+
+Live control checks on 2026-10-25 exercised the production Makefile against only this helper's LaunchAgent:
+
+- Stop unloaded the service and set its persistent login-disable flag. Repeated stop was safe.
+- Start loaded a running process and cleared the disable flag. Repeated start retained the same PID.
+- Restart waited for unload, then started a different PID. Both transition waits have a five-second bound.
+- Status correctly reported ON, OFF, login enablement, five selected sessions, and a missing installation. This Mac emits enabled/disabled values from print-disabled; the status reader also recognizes boolean values. The initial disabled-status assertion failed before correcting that parser.
+- Missing app and plist start attempts failed with the installation error before changing the running process.
+- Doctor and session listing executed through their Makefile targets.
+- The log target followed both actual logs. Ctrl-C closed the viewer and left the watcher PID unchanged.
+- The installed plist and attempt ledger were byte-for-byte unchanged by the control sequence. Fresh background startup again reported Accessibility true and dryRun false.
+- GNU Make 3.81 executed the targets. Expanded recipes passed bash syntax validation and ShellCheck at warning severity.
+
+The watcher was left running with startup at login enabled. This validation does not change the real-reset acceptance gate above.

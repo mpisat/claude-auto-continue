@@ -2,6 +2,19 @@
 
 The native watcher resumes selected existing local Code-tab sessions after a confirmed five-hour usage limit resets. It uses Swift and macOS Accessibility. It does not launch replacement CLI conversations.
 
+## Everyday controls
+
+Use the Makefile in the repository root. See [CONTROL.md](../CONTROL.md) for the short guide.
+
+```bash
+make status
+make stop
+make start
+make logs
+```
+
+`make stop` also disables startup at future logins; `make start` enables it again. These controls preserve the installed session selection, attempt ledger, logs and Claude's native auto-continue preference.
+
 ## Build and inspect
 
 Requires macOS 13 or later and an installed Swift 6 toolchain (Xcode or Command Line Tools). There are no third-party package dependencies.

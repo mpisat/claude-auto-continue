@@ -98,6 +98,9 @@ Vuoi la **ripresa automatica** (opt-in)? `powershell -ExecutionPolicy Bypass -Fi
 
 ### App desktop — macOS
 
+Already installed? Run `make` in this folder for start, stop, status and logs.
+See [the short control guide](CONTROL.md).
+
 The native macOS watcher monitors explicitly selected existing Code-tab sessions,
 waits for a confirmed five-hour limit to reset, and retries through the actual
 session's Accessibility controls. It includes dry-run diagnostics, durable attempt
